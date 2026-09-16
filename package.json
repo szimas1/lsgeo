@@ -6,21 +6,37 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "predev": "node scripts/copy-maplibre-worker.mjs",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
+    "test": "tsx --test tests/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@turf/turf": "^7.4.0",
+    "fflate": "^0.8.3",
+    "geographiclib-geodesic": "^2.2.0",
+    "maplibre-gl": "^6.10.0",
     "next": "16.3.3",
+    "proj4": "^2.22.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "shpjs": "^6.2.0"
   },
   "devDependencies": {
+    "@mapbox/shp-write": "^0.4.3",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/shpjs": "^3.4.7",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

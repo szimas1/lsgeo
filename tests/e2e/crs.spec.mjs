@@ -1,0 +1,41 @@
+import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import shpwrite from "@mapbox/shp-write";
+import { unzipSync } from "fflate";
+import { collection, feature } from "../fixtures/geometries.mjs";
+
+test("SIRGAS UTM com componentes soltos e recuperação manual do CRS", async ({ page }) => {
+  await page.route("https://tile.openstreetmap.org/**", route => route.abort());
+  await page.goto("/");
+  const prj = readFileSync(new URL("../fixtures/crs/31981-esriwkt.prj", import.meta.url), "utf8");
+  const data = collection([feature({ type: "Polygon", coordinates: [[[500000,8300000],[501000,8300000],[501000,8301000],[500000,8301000],[500000,8300000]]] })]);
+  const bytes = new Uint8Array(await shpwrite.zip(data, { outputType: "arraybuffer", prj }));
+  const inputs = Object.entries(unzipSync(bytes)).filter(([name]) => !name.endsWith("/")).map(([name, buffer]) => {
+    const extension = name.split(".").at(-1);
+    return { name: `${extension === "prj" ? "ÁREA SÃO JOÃO".normalize("NFD") : "Área São João"}.${extension.toUpperCase()}`, mimeType: "application/octet-stream", buffer: Buffer.from(buffer) };
+  });
+  inputs.push({ name: "área são joão.cpg", mimeType: "text/plain", buffer: Buffer.from("UTF-8") });
+  await page.getByLabel("Selecionar arquivos da camada A").setInputFiles(inputs);
+  await expect(page.getByText("1 features lidas · 1 disponíveis no mapa")).toBeVisible();
+  await expect(page.getByText("CRS: SIRGAS 2000 / UTM zone 21S — EPSG:31981").first()).toBeVisible();
+  await expect(page.getByText("Medições: SIRGAS 2000 / UTM zone 21S — EPSG:31981 · plano da projeção, 2D (m / m²)")).toBeVisible();
+  await expect(page.locator(".dataset-panel").getByText("100 ha", { exact: true })).toHaveCount(3);
+  const unknown = inputs.map(file => /\.PRJ$/.test(file.name) ? { ...file, buffer: Buffer.from('LOCAL_CS["Desconhecido",UNIT["Meter",1]]') } : file);
+  await page.getByLabel("Selecionar arquivos da camada B").setInputFiles(unknown);
+  await expect(page.getByText("1 features lidas · 0 disponíveis no mapa")).toBeVisible();
+  await expect(page.getByLabel("WKT da camada B")).toContainText('LOCAL_CS["Desconhecido"');
+  await page.getByRole("button", { name: "Comparar camadas" }).click();
+  await expect(page.locator("p[role=alert]")).toContainText("Comparação bloqueada");
+  await page.getByLabel("CRS de origem da camada B").selectOption("EPSG:31981");
+  await page.getByRole("button", { name: "Aplicar CRS à camada B" }).click();
+  await expect(page.getByText("1 features lidas · 1 disponíveis no mapa")).toHaveCount(2);
+  await expect(page.getByText(/Definido manualmente/)).toBeVisible();
+  await page.getByRole("button", { name: "Comparar camadas" }).click();
+  await expect(page.getByText("100%", { exact: true })).toHaveCount(2);
+  await expect(page.locator(".comparison-panel").getByText("100 ha", { exact: true })).toBeVisible();
+  await expect(page.locator(".comparison-panel").getByText("1.000.000 m²", { exact: true })).toBeVisible();
+  await page.getByText("WKT e definição manual de CRS", { exact: true }).last().click();
+  await page.getByRole("button", { name: "Voltar à identificação automática" }).click();
+  await expect(page.getByText("1 features lidas · 0 disponíveis no mapa")).toBeVisible();
+  await expect(page.getByText("100%", { exact: true })).toHaveCount(0);
+});

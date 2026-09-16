@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LSGeo
 
-## Getting Started
+Aplicação GIS em Next.js para carregar, validar, medir e comparar dados geoespaciais localmente no navegador.
 
-First, run the development server:
+## Executar
+
+Node.js 24 recomendado.
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra http://localhost:3000. Para produção local: `npm run build` e `npm start`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Funcionalidades
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Duas camadas independentes: GeoJSON ou Shapefile em ZIP/componentes soltos.
+- Shapefile exige SHP + SHX + DBF; PRJ em WKT reconhecido ou CRS definido manualmente libera mapa e cálculos. CPG opcional. SIRGAS 2000 geográfico/UTM 18S–25S, WGS84 e SAD69 são suportados.
+- Mapa MapLibre com pontos, linhas, polígonos, zoom, navegação, enquadramento e inspeção por clique.
+- Área em m²/ha/km², perímetro incluindo buracos, comprimento de linhas, contagem de pontos, bbox e centroide dos vértices.
+- Diagnósticos por feature, autointerseções, degeneração e duplicatas exatas.
+- Interseções internas, área ocupada sem dupla contagem, comparação A × B, interseção e diferenças visualizáveis.
+- Atributos preservados e tabela paginada. Processamento em Web Worker com cancelamento e limites.
 
-## Learn More
+## Verificação
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Os testes de interface iniciam o **build de produção** na porta 3100 e encerram o servidor depois. Deixe essa porta livre. O mapa-base é bloqueado deliberadamente nos testes para comprovar que os dados locais funcionam sem tiles externos.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Os testes unitários/de integração cobrem medidas numéricas, geometrias, diagnóstico, operações espaciais, Shapefile e WKTs reais. Quatro cenários no Chromium cobrem upload, worker, mapa clicável, atributos, comparação, troca de arquivo, seleção manual de CRS e layout móvel.
 
-## Deploy on Vercel
+## Dados para testar
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Em `tests/fixtures/files/` há GeoJSONs sintéticos identificados como dados de teste e um Shapefile ZIP. Carregue `layer-a.geojson` e `layer-b.geojson` nas respectivas camadas: a comparação deve indicar 50% de interseção para cada uma. `invalid.geojson` contém autointerseção; `hole.geojson`, um polígono com buraco.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Para regenerar: `node scripts/generate-geo-fixtures.mjs`. Esses dados não são carregados automaticamente pela aplicação e não representam fontes governamentais.
+
+## Limitações
+
+- Medições em 2D: área/perímetro na grade UTM original; GeographicLib no elipsoide WGS84 para dados geográficos. Origem, análise e visualização são separados. Veja a [investigação de precisão e os controles numéricos](docs/precisao-medicoes.md).
+- Diagnóstico não equivale à validação completa GEOS/OGC. Features inválidas são excluídas com indicação de resultados parciais.
+- CRS desconhecido bloqueia mapa e medições até a definição manual. Não há grades externas de datum; aproximações de transformação são informadas. Veja [suporte a CRS](docs/crs.md).
+- 20 MB por seleção, 5.000 features e 100.000 posições por camada. Operações poligonais têm limites adicionais; consulte a documentação.
+- Antimeridiano, latitudes fora da cobertura Web Mercator e GeometryCollection não são processados.
+- Não há persistência: recarregar perde as camadas. O mapa-base requer internet; as análises não enviam arquivos a servidor.
+
+Veja [arquitetura, métodos e limites](docs/arquitetura-gis.md) e [roteiro manual](docs/testes-geojson.md).
